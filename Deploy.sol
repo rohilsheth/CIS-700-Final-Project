@@ -13,7 +13,6 @@ contract Deploy is ERC721Enumerable, Ownable {
     Counters.Counter private _tokenIds;
 
     uint public constant MAX_SUPPLY = 7;
-    uint public constant PRICE = 0.01 ether;
     uint public constant MAX_PER_MINT = 7;
 
     string public baseTokenURI;
@@ -57,14 +56,6 @@ contract Deploy is ERC721Enumerable, Ownable {
             tokensId[i] = tokenOfOwnerByIndex(_owner, i);
         }
         return tokensId;
-    }
-
-    function withdraw() public payable onlyOwner {
-        uint balance = address(this).balance;
-        require(balance > 0, "No ether left to withdraw");
-
-        (bool success, ) = (msg.sender).call{value: balance}("");
-        require(success, "Transfer failed.");
     }
 
 }
