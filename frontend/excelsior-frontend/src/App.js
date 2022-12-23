@@ -29,6 +29,15 @@ function App(props) {
     const [highestBidder, setHighestBidder] = useState(null);
     const [highestBid, setHighestBid] = useState(null);
     const [auctionEnd, setAuctionEnd] = useState(null);
+    const ids_to_temp = new Map();
+    ids_to_temp.set(1, 9755);
+    ids_to_temp.set(2, 9760);
+    ids_to_temp.set(3, 9765);
+    ids_to_temp.set(4, 9770);
+    ids_to_temp.set(5, 9775);
+    ids_to_temp.set(6, 9780);
+    ids_to_temp.set(7, 9785);
+
 
     const checkWalletIsConnected = () => {
       const { ethereum } = window;
@@ -49,7 +58,7 @@ function App(props) {
       const valueToIncreaseBy = 0.0000000011206949854696092 * secondsSinceStartingTime;
       const newValue = 14.9756486321 + valueToIncreaseBy;
 
-      temp = newValue.toFixed(10)
+      temp = parseFloat(newValue.toFixed(10))
     }, 1000);
 
     const connectWalletHandler = async () => { 
@@ -86,9 +95,6 @@ function App(props) {
           setHighestBidder(ethers.utils.getAddress(topBidder));
           setAuctionEnd(ethers.utils.formatUnits(auctionEndTime, 0));
           const seller = await contract.seller();
-          console.log(seller);
-          console.log(currentAccount);
-          console.log(ethers.utils.getAddress(seller) == ethers.utils.getAddress(currentAccount));
           if (ethers.utils.getAddress(seller) == ethers.utils.getAddress(currentAccount)) {
             console.log("You are the owner!")
             setOwner(true);
@@ -113,11 +119,29 @@ function App(props) {
         const contract = new ethers.Contract(contractAddress, contractABI, signer)
         // Get the nft address, nft id, and starting price
         const nftAddress = ethers.utils.getAddress(document.querySelector("#nftAddress").value);
-        const nftId = document.querySelector("#nftId").value;
+        const nftId = parseInt(document.querySelector("#nftId").value);
         const startingPrice = parseInt(document.querySelector("#startingPrice").value);
-        const startTxn = await contract.start(nftAddress, nftId, startingPrice);
-        await startTxn.wait();
-        console.log("Auction Started!");
+        const nft_temp = parseFloat("14.".concat(String(ids_to_temp.get(nftId))));
+        if (nft_temp > temp) {
+          alert("The current temperature is too low for this NFT to be auctioned off!");
+          return;
+        }
+        try {
+          const startTxn = await contract.start(nftAddress, nftId, startingPrice);
+          await startTxn.wait();
+          console.log("Auction Started!");
+        } catch (error) {
+          const err = error.error.message;
+          if (err.includes("Already started!")) {
+            alert("Already started!");
+          } else if (err.includes("You did not start the auction!")) {
+            alert("You did not start the auction!");
+          } else {
+            alert("Transaction failed");
+          }
+        }
+
+        
       }
     }
 
@@ -128,9 +152,22 @@ function App(props) {
         const provider = new ethers.providers.Web3Provider(ethereum);
         const signer = provider.getSigner();
         const contract = new ethers.Contract(contractAddress, contractABI, signer)
-        const endTxn = await contract.end();
-        await endTxn.wait();
-        console.log("Auction Ended!");
+        try {
+          const endTxn = await contract.end();
+          await endTxn.wait();
+          console.log("Auction Ended!");
+        } catch (error) {
+          const err = error.error.message;
+          if (err.includes("Auction is still ongoing")) {
+            alert("Auction is still ongoing");
+          } else if (err.includes("You need to start first!")) {
+            alert("You need to start first!");
+          } else if (err.includes("Auction already ended!")) {
+            alert("Auction already ended!");
+          } else {
+            alert("Transaction failed");
+          }
+        }
       }
     }
 
@@ -142,11 +179,42 @@ function App(props) {
         const contract = new ethers.Contract(contractAddress, contractABI, signer)
         const bidValue = document.querySelector("#bidValue").value;
         const bidValueWei = ethers.utils.parseEther(bidValue);
-        const bidTxn = await contract.bid({value: bidValueWei});
-        await bidTxn.wait();
-        alert("Bid Complete!");
+        try {
+          const bidTxn = await contract.bid({value: bidValueWei});
+          await bidTxn.wait();
+          alert("Bid Complete!");
+        } catch (error) {
+          const err = error.error.message;
+          if (err.includes("Not started")) {
+            alert("Auction not started yet!");
+          } else if (err.includes("Ended!")) {
+            alert("Auction already ended!");
+          } else {
+            alert("Transaction failed, possibly due to insufficient bid");
+          }
+        }
+        
       }
     }
+
+    const withdrawHandler = async () => {
+      const {ethereum} = window;
+      if (ethereum) {
+        const provider = new ethers.providers.Web3Provider(ethereum);
+        const signer = provider.getSigner();
+        const contract = new ethers.Contract(contractAddress, contractABI, signer)
+        try {
+          const withdrawTxn = await contract.withdraw();
+          await withdrawTxn.wait();
+          alert("Withdraw Complete!");
+        } catch (error) {
+          const err = error.error.message;
+          alert(err);
+        }
+      }
+    }
+
+
 
     const connectWalletButton = () => {
       return (
@@ -206,6 +274,16 @@ function App(props) {
       )
     }
 
+    // Button that allows user to withdraw their bid
+    const withdrawButton = () => {
+      return (
+        <button onClick={withdrawHandler} className='cta-button withdraw-button' style={{backgroundColor: "red"}}>
+          Withdraw
+        </button>
+      )
+    }
+
+
     useEffect(() => {
       checkWalletIsConnected();
     }, []);
@@ -238,6 +316,7 @@ function App(props) {
                 {endAuctionButton()}
               </div> : <div style={{marginLeft: '25em', marginRight: '25em', marginTop:'3em', padding: '1em', border: '1px solid #ccc',borderRadius: '5px',backgroundColor: '#f2f2f2'}}>
                 {bidButton()}
+                {withdrawButton()}
                 </div>
               }
             </div>
